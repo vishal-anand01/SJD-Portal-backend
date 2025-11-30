@@ -3,6 +3,11 @@ import bcrypt from "bcryptjs";
 
 const UserSchema = new mongoose.Schema(
   {
+    uniqueId: {
+      type: String,
+      unique: true,
+      required: true,
+    },
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
     name: { type: String, trim: true },
@@ -18,6 +23,7 @@ const UserSchema = new mongoose.Schema(
     dob: { type: Date },
     address: { type: String, default: "" },
     city: { type: String, default: "" },
+    district: { type: String, default: "" },
     state: { type: String, default: "" },
     country: { type: String, default: "" },
     pincode: { type: String, default: "" },

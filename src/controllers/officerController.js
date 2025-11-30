@@ -371,6 +371,7 @@ export const updateOfficerProfile = asyncHandler(async (req, res) => {
     "dob",
     "address",
     "city",
+    "district",
     "state",
     "country",
     "pincode",
@@ -446,4 +447,98 @@ export const getMyAssignments = asyncHandler(async (req, res) => {
       error: error.message,
     });
   }
+});
+
+export const updateAssignmentVisit = async (req, res) => {
+  try {
+    const assignment = await Assignment.findById(req.params.id);
+    if (!assignment)
+      return res
+        .status(404)
+        .json({ success: false, message: "Assignment not found" });
+
+    assignment.visitReport = {
+      actualVisitDate: req.body.visitDate, // FIX ⭐
+      complaintsFound: req.body.total || 0, // FIX ⭐
+      complaintsRegistered: req.body.registered || 0, // FIX ⭐
+      complaintsSolved: req.body.solved || 0, // FIX ⭐
+      remarks: req.body.summary, // FIX ⭐
+      proofFile: req.file
+        ? req.file.filename
+        : assignment.visitReport?.proofFile,
+    };
+
+    assignment.status = "Completed";
+
+    await assignment.save();
+
+    res.json({ success: true, message: "Visit updated", assignment });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const getVisitComplaintsByDate = asyncHandler(async (req, res) => {
+  const { date, officerId } = req.query;
+  const loggedInUser = req.user;
+
+  if (!date) {
+    return res.status(400).json({
+      success: false,
+      message: "Visit date is required",
+    });
+  }
+
+  // 📅 Date range for full day
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+
+  // --------------------------------------------
+  // 🔥 Dynamic Filter (Officer or DM)
+  // --------------------------------------------
+  let filter = {
+    createdAt: { $gte: start, $lte: end },
+  };
+
+  // 👮 Officer logged in → ONLY his complaints
+  if (loggedInUser.role === "officer") {
+    filter.filedBy = loggedInUser._id;
+  }
+
+  // 🧑‍⚖️ DM logged in → Complaints filed by assigned officer
+  if (loggedInUser.role === "dm") {
+    if (!officerId) {
+      return res.status(400).json({
+        success: false,
+        message: "Officer ID is required for DM request",
+      });
+    }
+    filter.filedBy = officerId;
+  }
+
+  // 🔍 Fetch complaints
+  const complaints = await Complaint.find(filter)
+    .sort({ createdAt: -1 })
+    .select("trackingId title status citizenName createdAt");
+
+  // --------------------------------------------
+  // 📊 Stats Calculation
+  // --------------------------------------------
+  const stats = {
+    total: complaints.length,
+    solved: complaints.filter((c) => c.status === "Resolved").length,
+    pending: complaints.filter((c) => c.status === "Pending").length,
+    forwarded: complaints.filter((c) => c.status === "Forwarded").length,
+    rejected: complaints.filter((c) => c.status === "Rejected").length,
+    inProgress: complaints.filter((c) => c.status === "In Progress").length,
+  };
+
+  res.status(200).json({
+    success: true,
+    stats,
+    complaints,
+  });
 });

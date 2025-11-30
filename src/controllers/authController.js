@@ -7,6 +7,26 @@ import auditService from "../services/auditService.js";
 import { sendEmail } from "../services/emailService.js";
 import { generateWelcomeEmail } from "../emailTemplates/welcomeEmail.js";
 
+// Helper: Generate Unique SJD ID
+async function generateUniqueId() {
+  const currentYear = new Date().getFullYear();
+
+  const lastUser = await User.findOne({
+    uniqueId: new RegExp(`SJD/${currentYear}/`),
+  }).sort({ createdAt: -1 });
+
+  let lastNumber = 0;
+
+  if (lastUser && lastUser.uniqueId) {
+    const parts = lastUser.uniqueId.split("/");
+    lastNumber = parseInt(parts[2]); // e.g. SJD/2025/0045 → 45
+  }
+
+  const newNumber = (lastNumber + 1).toString().padStart(4, "0");
+
+  return `SJD/${currentYear}/${newNumber}`;
+}
+
 /**
  * @desc    Register new user
  * @route   POST /api/auth/register
@@ -22,6 +42,7 @@ export const registerUser = asyncHandler(async (req, res) => {
     dob,
     address,
     city,
+    district,
     state,
     country,
     pincode,
@@ -41,6 +62,9 @@ export const registerUser = asyncHandler(async (req, res) => {
     throw new Error("User already registered with this email.");
   }
 
+  // ⭐ Generate Unique SJD ID
+  const uniqueId = await generateUniqueId();
+
   // ✅ Create new user
   const newUser = await User.create({
     firstName,
@@ -52,10 +76,12 @@ export const registerUser = asyncHandler(async (req, res) => {
     dob,
     address,
     city,
+    district,
     state,
     country,
     pincode,
     gender,
+    uniqueId,
     role: "public",
   });
 
@@ -73,6 +99,7 @@ export const registerUser = asyncHandler(async (req, res) => {
     details: {
       name: newUser.name,
       email: newUser.email,
+      uniqueId: newUser.uniqueId,
     },
     req,
   });
@@ -109,6 +136,8 @@ export const registerUser = asyncHandler(async (req, res) => {
       id: newUser._id,
       name: newUser.name,
       email: newUser.email,
+      district: newUser.district,
+      uniqueId: newUser.uniqueId,
       role: newUser.role,
     },
   });
@@ -119,47 +148,55 @@ export const registerUser = asyncHandler(async (req, res) => {
  * @route   POST /api/auth/login
  * @access  Public
  */
+
 export const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  // ✅ Validate inputs
-  if (!email || !password) {
-    res.status(400);
-    throw new Error("Email and password are required.");
+  // ❌ Email missing
+  if (!email) {
+    return res.status(400).json({
+      field: "email",
+      message: "Email is required.",
+    });
   }
 
-  // ✅ Find user
+  // ❌ Password missing
+  if (!password) {
+    return res.status(400).json({
+      field: "password",
+      message: "Password is required.",
+    });
+  }
+
   const user = await User.findOne({ email }).select("+password");
-  if (!user || !(await user.matchPassword(password))) {
-    res.status(401);
-    throw new Error("Invalid email or password.");
+
+  // ❌ Email not found
+  if (!user) {
+    return res.status(400).json({
+      field: "email",
+      message: "No user found with this email.",
+    });
   }
 
-  // ✅ Generate token
+  // ❌ Wrong password
+  const isMatch = await user.matchPassword(password);
+  if (!isMatch) {
+    return res.status(400).json({
+      field: "password",
+      message: "Incorrect password. Please try again.",
+    });
+  }
+
+  // ⭐ All good → Generate token
   const token = generateToken(user);
 
-  // ✅ Set cookie
   res.cookie("token", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 60 * 60 * 1000, // 1 hour
+    maxAge: 60 * 60 * 1000,
   });
 
-  // ✅ Log activity
-  await auditService.log({
-    actor: {
-      id: user._id,
-      email: user.email,
-      role: user.role,
-    },
-    action: "USER_LOGGED_IN",
-    resourceType: "User",
-    resourceId: user._id.toString(),
-    req,
-  });
-
-  // ✅ Response
   res.status(200).json({
     message: "Login successful",
     token,

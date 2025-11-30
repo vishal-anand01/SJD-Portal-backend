@@ -230,9 +230,10 @@ export const updateAssignmentStatus = asyncHandler(async (req, res) => {
 /* -------------------------------------------------------------------------- */
 export const listOfficers = asyncHandler(async (req, res) => {
   try {
-    const officers = await User.find({ role: "officer" })
+    const dmDistrict = req.user.district;
+    const officers = await User.find({ role: "officer", district: dmDistrict })
       .select(
-        "firstName lastName email phone role createdAt gender dob address city state country pincode isVerified lastActiveAt"
+        "firstName lastName email phone role createdAt gender dob address city district state country pincode isVerified lastActiveAt"
       )
       .sort({ createdAt: -1 });
 
@@ -272,7 +273,6 @@ export const listAllComplaints = asyncHandler(async (req, res) => {
       .json({ success: false, message: "Failed to fetch complaints" });
   }
 });
-
 
 /* -------------------------------------------------------------------------- */
 /* ✏️ UPDATE DM PROFILE (with image/pdf upload)                               */
@@ -344,9 +344,7 @@ export const updateDMProfile = asyncHandler(async (req, res) => {
     await dm.save();
 
     // ✅ Fetch fresh updated DM profile
-    const updatedDM = await User.findById(dmId).select(
-      "-password -__v"
-    );
+    const updatedDM = await User.findById(dmId).select("-password -__v");
 
     return res.status(200).json({
       success: true,
@@ -367,4 +365,3 @@ export const updateDMProfile = asyncHandler(async (req, res) => {
     });
   }
 });
-

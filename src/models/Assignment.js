@@ -74,6 +74,16 @@ const AssignmentSchema = new mongoose.Schema(
       type: Date,
       default: Date.now, // ✅ exact timestamp when assigned
     },
+    
+    // NEW Visit Report Fields
+    visitReport: {
+      actualVisitDate: { type: Date },
+      complaintsFound: { type: Number, default: 0 },
+      complaintsRegistered: { type: Number, default: 0 },
+      complaintsSolved: { type: Number, default: 0 },
+      remarks: { type: String },
+      proofFile: { type: String }, // stored filename
+    },
 
     // 🕓 History of actions
     history: [HistorySchema],

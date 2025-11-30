@@ -3,6 +3,7 @@ import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 import {
   uploadOfficerPhoto,
   uploadComplaintAttachment,
+  uploadAssignmentProof, // ⭐ NEW (Visit Report Proof)
 } from "../middleware/uploadMiddleware.js";
 
 import {
@@ -14,17 +15,19 @@ import {
   getOfficerVisits,
   addVisitComplaint,
   getMyAssignments,
+  updateAssignmentVisit, // ⭐ NEW Visit Report Controller
+  getVisitComplaintsByDate,
 } from "../controllers/officerController.js";
 
 const router = express.Router();
 
 /* -------------------------------------------------------------------------- */
-/* 🔐 All routes below require authentication                                 */
+/* 🔐 All officer routes require authentication                               */
 /* -------------------------------------------------------------------------- */
 router.use(protect);
 
 /* -------------------------------------------------------------------------- */
-/* 📋 Officer Complaints (Dashboard List)                                     */
+/* 📋 1. Officer Complaints (Dashboard)                                       */
 /* -------------------------------------------------------------------------- */
 router.get(
   "/complaints",
@@ -33,27 +36,27 @@ router.get(
 );
 
 /* -------------------------------------------------------------------------- */
-/* 🔄 Update Complaint Status (with optional attachment)                      */
+/* 🔄 2. Update Complaint Status                                              */
 /* -------------------------------------------------------------------------- */
 router.put(
   "/complaints/:complaintId",
   authorizeRoles("officer", "admin", "superadmin"),
-  uploadComplaintAttachment, // field name = "attachment"
+  uploadComplaintAttachment, // field = attachment
   updateComplaintStatus
 );
 
 /* -------------------------------------------------------------------------- */
-/* 🔁 Forward Complaint (optional attachment)                                 */
+/* 🔁 3. Forward Complaint                                                    */
 /* -------------------------------------------------------------------------- */
 router.put(
   "/complaints/:complaintId/forward",
   authorizeRoles("officer", "admin", "superadmin"),
-  uploadComplaintAttachment,
+  uploadComplaintAttachment, // field = attachment
   forwardComplaint
 );
 
 /* -------------------------------------------------------------------------- */
-/* 🧾 Officer Visits (Fetch Assigned Visits)                                  */
+/* 🧾 4. Officer Visits Assigned by DM                                       */
 /* -------------------------------------------------------------------------- */
 router.get(
   "/visits",
@@ -62,34 +65,35 @@ router.get(
 );
 
 /* -------------------------------------------------------------------------- */
-/* 🆕 Add Field Visit Complaint (Officer Filing for Citizen)                  */
+/* 🆕 5. File On-Spot Visit Complaint (Officer → Citizen)                     */
 /* -------------------------------------------------------------------------- */
-// 📎 Expect file field name: "attachment" (single file upload)
 router.post(
   "/visit-complaints",
   authorizeRoles("officer", "admin", "superadmin"),
-  uploadComplaintAttachment,
+  uploadComplaintAttachment, // field = attachment
   addVisitComplaint
 );
 
 /* -------------------------------------------------------------------------- */
-/* 👤 Officer Profile (Get + Update + Photo Upload)                           */
+/* 👤 6. Officer Profile (Get + Update)                                       */
 /* -------------------------------------------------------------------------- */
+// 👉 Get profile
 router.get(
   "/profile",
   authorizeRoles("officer", "admin", "superadmin"),
   getOfficerProfile
 );
 
+// 👉 Update profile + photo/pdf
 router.put(
   "/profile",
   authorizeRoles("officer", "admin", "superadmin"),
-  uploadOfficerPhoto, // field name = "photo"
+  uploadOfficerPhoto, // field = photo
   updateOfficerProfile
 );
 
 /* -------------------------------------------------------------------------- */
-/* 📋 My Assignments (Assigned by DM)                                         */
+/* 📋 7. Officer's Assigned Visits (DM Assigned)                              */
 /* -------------------------------------------------------------------------- */
 router.get(
   "/assignments",
@@ -98,6 +102,23 @@ router.get(
 );
 
 /* -------------------------------------------------------------------------- */
-/* ✅ Export Router                                                          */
+/* ✏️ 8. UPDATE VISIT REPORT (Main Update by Officer)                         */
+/* -------------------------------------------------------------------------- */
+// field = proofFile (PDF/Images allowed)
+router.put(
+  "/assignments/:id/update",
+  authorizeRoles("officer", "admin", "superadmin"),
+  uploadAssignmentProof, // ⭐ NEW upload for visit proof
+  updateAssignmentVisit
+);
+
+router.get(
+  "/visit-complaints/by-date",
+  authorizeRoles("officer", "admin", "superadmin", "dm"),
+  getVisitComplaintsByDate
+);
+
+/* -------------------------------------------------------------------------- */
+/* 🎯 EXPORT ROUTER                                                          */
 /* -------------------------------------------------------------------------- */
 export default router;

@@ -45,5 +45,6 @@ export const uploadComplaintAttachment = upload.single("attachment"); // for com
 export const uploadDMPhoto = upload.single("photo");
 export const uploadOfficerPhoto = upload.single("photo");
 export const uploadOfficerFile = upload.single("file");
+export const uploadAssignmentProof = upload.single("proofFile");
 
 export default upload;
