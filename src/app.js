@@ -111,9 +111,9 @@ import complaintRoutes from "./routes/complaintRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import publicRoutes from "./routes/publicRoutes.js";
 import dmRoutes from "./routes/dmRoutes.js";
-// import departmentRoutes from "./routes/departmentRoutes.js";
+import departmentRoutes from "./routes/departmentRoutes.js";
 import officerRoutes from "./routes/officerRoutes.js";
-
+import superAdminRoutes from "./routes/superAdminRoutes.js";
 import lgdRoutes from "./routes/lgdRoutes.js";
 
 app.use("/api/auth", authRoutes);
@@ -121,7 +121,9 @@ app.use("/api/complaints", complaintRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/public", publicRoutes);
 app.use("/api/officer", officerRoutes);
+app.use("/api/department", departmentRoutes);
 app.use("/api/dm", dmRoutes);
+app.use("/api/superadmin", superAdminRoutes);
 
 // Route for LGD data
 app.use("/api/lgd", lgdRoutes);

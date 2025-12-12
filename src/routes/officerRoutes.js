@@ -17,6 +17,8 @@ import {
   getMyAssignments,
   updateAssignmentVisit, // ⭐ NEW Visit Report Controller
   getVisitComplaintsByDate,
+  getAllDepartments,
+  getAllOfficers,
 } from "../controllers/officerController.js";
 
 const router = express.Router();
@@ -116,6 +118,18 @@ router.get(
   "/visit-complaints/by-date",
   authorizeRoles("officer", "admin", "superadmin", "dm"),
   getVisitComplaintsByDate
+);
+
+router.get(
+  "/officers",
+  authorizeRoles("officer", "admin", "superadmin"),
+  getAllOfficers
+);
+
+router.get(
+  "/departments",
+  authorizeRoles("officer", "admin", "superadmin"),
+  getAllDepartments
 );
 
 /* -------------------------------------------------------------------------- */

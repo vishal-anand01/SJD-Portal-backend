@@ -18,6 +18,14 @@ const UserSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
+    designation: {
+      type: String,
+      default: "",
+    },
+    departmentName: {
+      type: String,
+      default: "",
+    },
     password: { type: String, required: true, select: false },
     phone: { type: String, default: "" },
     dob: { type: Date },

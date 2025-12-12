@@ -18,8 +18,17 @@ import path from "path";
  */
 export const getOfficerComplaints = asyncHandler(async (req, res) => {
   try {
-    // 🧠 Fetch all complaints (Public + Officer)
-    const complaints = await Complaint.find({})
+    const officerDistrict = req.user.district;
+
+    if (!officerDistrict) {
+      return res.status(400).json({
+        success: false,
+        message: "Officer district not found in profile",
+      });
+    }
+
+    // 🔍 Officer ke district ki saari complaints
+    const complaints = await Complaint.find({ district: officerDistrict })
       .sort({ createdAt: -1 })
       .populate({
         path: "citizen",
@@ -27,20 +36,24 @@ export const getOfficerComplaints = asyncHandler(async (req, res) => {
         select:
           "firstName lastName email phone dob gender address city state country pincode role",
       })
-      .populate("filedBy", "firstName lastName email role") // ✅ Added (important)
-      .populate("managedBy", "firstName lastName email role")
-      .populate("officerUpdates.updatedBy", "firstName lastName role email");
+      .populate(
+        "filedBy",
+        "firstName lastName email phone role uniqueId designation"
+      )
+      .populate("managedBy", "firstName lastName email role phone")
+      .populate("officerUpdates.updatedBy", "firstName lastName email role");
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       count: complaints.length,
       complaints,
     });
   } catch (error) {
-    console.error("❌ Error fetching officer complaints:", error);
-    res.status(500).json({
+    console.error("❌ Error fetching officer complaints:", error.message);
+
+    return res.status(500).json({
       success: false,
-      message: "Failed to fetch complaints",
+      message: "Failed to fetch officer complaints",
       error: error.message,
     });
   }
@@ -119,72 +132,6 @@ export const updateComplaintStatus = asyncHandler(async (req, res) => {
 });
 
 /* -------------------------------------------------------------------------- */
-/* 🟣 FORWARD COMPLAINT                                                       */
-/* -------------------------------------------------------------------------- */
-/**
- * Route: PUT /api/officer/complaints/:complaintId/forward
- * Access: Private (Officer)
- */
-export const forwardComplaint = asyncHandler(async (req, res) => {
-  const { forwardTo, remarks } = req.body;
-  const { complaintId } = req.params;
-  const officer = req.user;
-
-  const complaint = await Complaint.findById(complaintId);
-  if (!complaint) {
-    res.status(404);
-    throw new Error("Complaint not found");
-  }
-
-  // 📎 Handle attachment
-  if (req.file) complaint.attachments = req.file.filename;
-
-  complaint.status = "Forwarded";
-  complaint.assignedTo = forwardTo || null;
-  complaint.remarks = remarks || "";
-  complaint.managedBy = officer._id;
-
-  // ⏳ Update timeline
-  complaint.officerUpdates.push({
-    updatedBy: officer._id,
-    role: officer.role,
-    status: "Forwarded",
-    remarks: remarks || "",
-    attachment: req.file ? req.file.filename : "",
-    date: new Date(),
-  });
-
-  await complaint.save();
-
-  // 🧾 Log forwarding
-  await auditService.log({
-    actor: { id: officer._id, email: officer.email, role: officer.role },
-    action: "COMPLAINT_FORWARDED",
-    resourceType: "Complaint",
-    resourceId: complaint._id.toString(),
-    details: { forwardTo, remarks },
-    req,
-  });
-
-  // 🔔 Socket event
-  const io = req.app.get("io");
-  io?.emit("complaint:refresh", {
-    id: complaint._id,
-    status: "Forwarded",
-  });
-
-  logger.info(
-    `Complaint ${complaint.trackingId} forwarded by ${officer.email} to ${forwardTo}`
-  );
-
-  res.status(200).json({
-    success: true,
-    message: "Complaint forwarded successfully",
-    complaint,
-  });
-});
-
-/* -------------------------------------------------------------------------- */
 /* 🟡 GET OFFICER VISITS (Assigned by DM)                                     */
 /* -------------------------------------------------------------------------- */
 /**
@@ -214,7 +161,6 @@ export const addVisitComplaint = asyncHandler(async (req, res) => {
       citizenMobile,
       citizenDob,
       title,
-      category,
       description,
       location,
       village,
@@ -229,10 +175,10 @@ export const addVisitComplaint = asyncHandler(async (req, res) => {
     const officer = req.user;
 
     // 🧩 Validate required fields
-    if (!title || !category || !description || !location) {
+    if (!title || !description || !location) {
       res.status(400);
       throw new Error(
-        "All mandatory fields are required: title, category, description, location"
+        "All mandatory fields are required: title,  description, location"
       );
     }
 
@@ -248,7 +194,6 @@ export const addVisitComplaint = asyncHandler(async (req, res) => {
       citizenDob: citizenDob || null,
 
       title: title?.trim(),
-      category: category?.trim(),
       description: description?.trim(),
       location: location?.trim(),
 
@@ -259,8 +204,7 @@ export const addVisitComplaint = asyncHandler(async (req, res) => {
       state: state?.trim() || "",
       pincode: pincode?.trim() || "",
       landmark: landmark?.trim() || "",
-
-      attachments: attachment,
+      attachments: attachment ? [attachment] : [],
       status: "Pending",
       managedBy: officer._id,
       remarks: "",
@@ -275,7 +219,6 @@ export const addVisitComplaint = asyncHandler(async (req, res) => {
         resourceId: newComplaint._id.toString(),
         details: {
           title,
-          category,
           citizenName,
           citizenMobile,
           location,
@@ -375,6 +318,7 @@ export const updateOfficerProfile = asyncHandler(async (req, res) => {
     "state",
     "country",
     "pincode",
+    "designation",
   ];
 
   let emailChanged = false;
@@ -540,5 +484,92 @@ export const getVisitComplaintsByDate = asyncHandler(async (req, res) => {
     success: true,
     stats,
     complaints,
+  });
+});
+
+export const getAllDepartments = asyncHandler(async (req, res) => {
+  try {
+    const departments = await User.find({ role: "department" }).select(
+      "_id firstName lastName email departmentName"
+    );
+
+    res.json({
+      success: true,
+      departments,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch departments list",
+    });
+  }
+});
+
+export const getAllOfficers = asyncHandler(async (req, res) => {
+  try {
+    const officers = await User.find({ role: "officer" }).select(
+      "_id firstName lastName email designation"
+    );
+
+    res.json({
+      success: true,
+      officers,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch officers list",
+    });
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/* 🟣 FORWARD COMPLAINT                                                       */
+/* -------------------------------------------------------------------------- */
+/**
+ * Route: PUT /api/officer/complaints/:complaintId/forward
+ * Access: Private (Officer)
+ */
+export const forwardComplaint = asyncHandler(async (req, res) => {
+  const { forwardTo, remarks } = req.body;
+  const { complaintId } = req.params;
+  const officer = req.user;
+
+  const complaint = await Complaint.findById(complaintId);
+  if (!complaint) {
+    return res.status(404).json({ message: "Complaint not found" });
+  }
+
+  // Parse forwardTo: "officer:id"
+  const [type, id] = forwardTo.split(":");
+
+  if (type === "officer") complaint.forwardedToOfficer = id;
+  if (type === "department") complaint.forwardedToDepartment = id;
+  if (type === "dm") complaint.forwardedToDM = id;
+
+  // Attachment
+  let attachment = req.file ? req.file.filename : null;
+
+  // COMPULSORY → Save to forwards[] history
+  complaint.forwards.push({
+    type,
+    to: id,
+    remarks: remarks || "",
+    attachment: attachment || "",
+    forwardedBy: officer._id,
+    date: new Date(),
+  });
+
+  // update status
+  complaint.status = "Forwarded";
+  complaint.managedBy = officer._id;
+  complaint.remarks = remarks || "";
+
+  await complaint.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Complaint forwarded successfully",
+    complaint,
   });
 });

@@ -233,7 +233,7 @@ export const listOfficers = asyncHandler(async (req, res) => {
     const dmDistrict = req.user.district;
     const officers = await User.find({ role: "officer", district: dmDistrict })
       .select(
-        "firstName lastName email phone role createdAt gender dob address city district state country pincode isVerified lastActiveAt"
+        "firstName lastName email phone role createdAt gender dob address city district state country pincode isVerified lastActiveAt uniqueId designation"
       )
       .sort({ createdAt: -1 });
 
@@ -256,7 +256,9 @@ export const listOfficers = asyncHandler(async (req, res) => {
 /* -------------------------------------------------------------------------- */
 export const listAllComplaints = asyncHandler(async (req, res) => {
   try {
-    const complaints = await Complaint.find({})
+    const dmDistrict = req.user.district; // ⭐ DM district
+
+    const complaints = await Complaint.find({ district: dmDistrict }) // ⭐ Filter applied
       .populate("citizen", "-password")
       .populate("filedBy", "firstName lastName email role")
       .sort({ createdAt: -1 });
@@ -307,6 +309,7 @@ export const updateDMProfile = asyncHandler(async (req, res) => {
       "state",
       "country",
       "pincode",
+      "designation",
     ];
 
     let emailChanged = false;
