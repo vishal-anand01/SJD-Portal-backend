@@ -96,6 +96,19 @@ export const changeDMRole = asyncHandler(async (req, res) => {
   res.json({ success: true, role: dm.role });
 });
 
+export const getDMById = asyncHandler(async (req, res) => {
+  const dm = await User.findById(req.params.id);
+
+  if (!dm) {
+    return res.status(404).json({ message: "DM not found" });
+  }
+
+  res.json({ dm });
+});
+
+
+
+
 /* -------------------------------------------------------------------------- */
 /* 🟩 OFFICER MANAGEMENT                                                       */
 /* -------------------------------------------------------------------------- */

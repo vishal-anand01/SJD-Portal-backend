@@ -13,6 +13,7 @@ import {
   updateDM,
   deleteDM,
   changeDMRole,
+  getDMById,
 
   // Officers
   listOfficersSA,
@@ -59,6 +60,7 @@ router.post("/dm", uploadDMPhoto, addDM);
 router.put("/dm/:id", uploadDMPhoto, updateDM);
 router.delete("/dm/:id", deleteDM);
 router.put("/dm/:id/role", changeDMRole);
+router.get("/dm/:id", getDMById);
 
 /* -------------------------------------------------------------------------- */
 /* 🟩 OFFICER MANAGEMENT                                                       */
