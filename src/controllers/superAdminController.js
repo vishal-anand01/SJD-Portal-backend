@@ -2,6 +2,7 @@
 import asyncHandler from "../middleware/asyncHandler.js";
 import User from "../models/User.js";
 import Complaint from "../models/Complaint.js";
+import DeletedUser from "../models/DeletedUser.js";
 
 // ⭐ SAME LOGIC IMPORTED FROM authController (copy here)
 async function generateUniqueIdForDM() {
@@ -25,6 +26,48 @@ async function generateUniqueIdForDM() {
   return `SJD/${currentYear}/${newNumber}`;
 }
 
+export const softDeleteUserWithBackup = asyncHandler(async (req, res) => {
+  const userId = req.params.id;
+  const adminId = req.user._id;
+
+  const user = await User.findById(userId);
+  if (!user || user.isDeleted) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  // 🔹 Example related data (optional)
+  const complaints = await Complaint.find({
+    $or: [
+      { citizen: user._id },
+      { filedBy: user._id },
+      { managedBy: user._id },
+    ],
+  });
+
+  // 🔹 Backup
+  await DeletedUser.create({
+    originalUserId: user._id,
+    role: user.role,
+    email: user.email,
+    uniqueId: user.uniqueId,
+    fullData: user.toObject(),
+    relatedData: { complaints },
+    deletedBy: adminId,
+    reason: "Deleted by SuperAdmin",
+  });
+
+  // 🔹 Soft delete
+  user.isDeleted = true;
+  user.deletedAt = new Date();
+  user.email = `deleted_${Date.now()}_${user.email}`; // avoid unique conflict
+  await user.save();
+
+  res.json({
+    success: true,
+    message: "User deleted & archived successfully",
+  });
+});
+
 /* -------------------------------------------------------------------------- */
 /* 📊 SYSTEM STATS                                                            */
 /* -------------------------------------------------------------------------- */
@@ -45,7 +88,11 @@ export const getSystemStats = asyncHandler(async (req, res) => {
 /* 🟦 DM MANAGEMENT                                                            */
 /* -------------------------------------------------------------------------- */
 export const listDMs = asyncHandler(async (_, res) => {
-  const dms = await User.find({ role: "dm" }).select("-password");
+  const dms = await User.find({
+    role: "dm",
+    isDeleted: { $ne: true },
+  }).select("-password");
+
   res.json({ success: true, dms });
 });
 
@@ -82,11 +129,6 @@ export const updateDM = asyncHandler(async (req, res) => {
   res.json({ success: true, dm });
 });
 
-export const deleteDM = asyncHandler(async (req, res) => {
-  await User.findByIdAndDelete(req.params.id);
-  res.json({ success: true, message: "DM deleted" });
-});
-
 export const changeDMRole = asyncHandler(async (req, res) => {
   const dm = await User.findByIdAndUpdate(
     req.params.id,
@@ -105,9 +147,6 @@ export const getDMById = asyncHandler(async (req, res) => {
 
   res.json({ dm });
 });
-
-
-
 
 /* -------------------------------------------------------------------------- */
 /* 🟩 OFFICER MANAGEMENT                                                       */
@@ -129,11 +168,6 @@ export const updateOfficerSA = asyncHandler(async (req, res) => {
   res.json({ success: true, officer });
 });
 
-export const deleteOfficerSA = asyncHandler(async (req, res) => {
-  await User.findByIdAndDelete(req.params.id);
-  res.json({ success: true, message: "Officer deleted" });
-});
-
 export const changeOfficerRole = asyncHandler(async (req, res) => {
   const officer = await User.findByIdAndUpdate(
     req.params.id,
@@ -147,10 +181,12 @@ export const changeOfficerRole = asyncHandler(async (req, res) => {
 /* 🟧 DEPARTMENT MANAGEMENT                                                    */
 /* -------------------------------------------------------------------------- */
 export const listDepartmentsSA = asyncHandler(async (_, res) => {
-  const departmentUsers = await User.find({ role: "department" }).select(
-    "-password"
-  );
-  res.json({ success: true, departmentUsers });
+  const departments = await User.find({
+    role: "department",
+    isDeleted: { $ne: true },
+  }).select("-password");
+
+  res.json({ success: true, departmentUsers: departments });
 });
 
 export const addDepartmentUser = asyncHandler(async (req, res) => {
@@ -165,9 +201,19 @@ export const updateDepartmentUser = asyncHandler(async (req, res) => {
   res.json({ success: true, depUser });
 });
 
-export const deleteDepartmentUser = asyncHandler(async (req, res) => {
-  await User.findByIdAndDelete(req.params.id);
-  res.json({ success: true, message: "Department user deleted" });
+// 🔍 GET SINGLE DEPARTMENT BY ID (FOR VIEW PAGE)
+export const getDepartmentByIdSA = asyncHandler(async (req, res) => {
+  const department = await User.findOne({
+    _id: req.params.id,
+    role: "department",
+    isDeleted: { $ne: true },
+  }).select("-password");
+
+  if (!department) {
+    return res.status(404).json({ message: "Department not found" });
+  }
+
+  res.json({ success: true, department });
 });
 
 /* -------------------------------------------------------------------------- */

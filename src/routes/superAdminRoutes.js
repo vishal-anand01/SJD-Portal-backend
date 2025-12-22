@@ -5,13 +5,13 @@ import { requireRole } from "../middleware/roleMiddleware.js";
 import { uploadDMPhoto } from "../middleware/uploadMiddleware.js";
 
 import {
+  softDeleteUserWithBackup,
   getSystemStats,
 
   // DM
   listDMs,
   addDM,
   updateDM,
-  deleteDM,
   changeDMRole,
   getDMById,
 
@@ -19,14 +19,13 @@ import {
   listOfficersSA,
   addOfficer,
   updateOfficerSA,
-  deleteOfficerSA,
   changeOfficerRole,
 
   // Departments
   listDepartmentsSA,
   addDepartmentUser,
   updateDepartmentUser,
-  deleteDepartmentUser,
+  getDepartmentByIdSA,
 
   // Public
   listPublicUsers,
@@ -48,6 +47,12 @@ router.use(protect);
 router.use(requireRole("superadmin"));
 
 /* -------------------------------------------------------------------------- */
+/* 📊 User Delete Route                                                 */
+/* -------------------------------------------------------------------------- */
+
+router.delete("/users/:id/soft-delete", softDeleteUserWithBackup);
+
+/* -------------------------------------------------------------------------- */
 /* 📊 SYSTEM DASHBOARD STATS                                                  */
 /* -------------------------------------------------------------------------- */
 router.get("/stats", getSystemStats);
@@ -58,7 +63,6 @@ router.get("/stats", getSystemStats);
 router.get("/dm", listDMs);
 router.post("/dm", uploadDMPhoto, addDM);
 router.put("/dm/:id", uploadDMPhoto, updateDM);
-router.delete("/dm/:id", deleteDM);
 router.put("/dm/:id/role", changeDMRole);
 router.get("/dm/:id", getDMById);
 
@@ -68,7 +72,6 @@ router.get("/dm/:id", getDMById);
 router.get("/officers", listOfficersSA);
 router.post("/officers", addOfficer);
 router.put("/officers/:id", updateOfficerSA);
-router.delete("/officers/:id", deleteOfficerSA);
 router.put("/officers/:id/role", changeOfficerRole);
 
 /* -------------------------------------------------------------------------- */
@@ -77,7 +80,8 @@ router.put("/officers/:id/role", changeOfficerRole);
 router.get("/departments/users", listDepartmentsSA);
 router.post("/departments/users", addDepartmentUser);
 router.put("/departments/users/:id", updateDepartmentUser);
-router.delete("/departments/users/:id", deleteDepartmentUser);
+router.get("/departments/users/:id", getDepartmentByIdSA);
+
 
 /* -------------------------------------------------------------------------- */
 /* 🟨 PUBLIC USER MANAGEMENT                                                   */

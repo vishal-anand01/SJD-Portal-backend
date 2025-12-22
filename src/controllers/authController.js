@@ -152,7 +152,6 @@ export const registerUser = asyncHandler(async (req, res) => {
 export const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  // ❌ Email missing
   if (!email) {
     return res.status(400).json({
       field: "email",
@@ -160,7 +159,6 @@ export const loginUser = asyncHandler(async (req, res) => {
     });
   }
 
-  // ❌ Password missing
   if (!password) {
     return res.status(400).json({
       field: "password",
@@ -168,17 +166,19 @@ export const loginUser = asyncHandler(async (req, res) => {
     });
   }
 
-  const user = await User.findOne({ email }).select("+password");
+  // 🔥 IMPORTANT CHANGE
+  const user = await User.findOne({
+    email,
+    isDeleted: false, // ⬅️ deleted user block
+  }).select("+password");
 
-  // ❌ Email not found
   if (!user) {
     return res.status(400).json({
       field: "email",
-      message: "No user found with this email.",
+      message: "Account not found or has been deleted.",
     });
   }
 
-  // ❌ Wrong password
   const isMatch = await user.matchPassword(password);
   if (!isMatch) {
     return res.status(400).json({
@@ -187,7 +187,6 @@ export const loginUser = asyncHandler(async (req, res) => {
     });
   }
 
-  // ⭐ All good → Generate token
   const token = generateToken(user);
 
   res.cookie("token", token, {
