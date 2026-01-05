@@ -46,5 +46,6 @@ export const uploadDMPhoto = upload.single("photo");
 export const uploadOfficerPhoto = upload.single("photo");
 export const uploadOfficerFile = upload.single("file");
 export const uploadAssignmentProof = upload.single("proofFile");
+export const uploadDepartmentPhoto = upload.single("photo");
 
 export default upload;

@@ -3,6 +3,7 @@ import express from "express";
 import { protect } from "../middleware/authMiddleware.js";
 import { requireRole } from "../middleware/roleMiddleware.js";
 import { uploadDMPhoto } from "../middleware/uploadMiddleware.js";
+import { uploadDepartmentPhoto } from "../middleware/uploadMiddleware.js";
 
 import {
   softDeleteUserWithBackup,
@@ -78,10 +79,13 @@ router.put("/officers/:id/role", changeOfficerRole);
 /* 🟧 DEPARTMENT MANAGEMENT                                                    */
 /* -------------------------------------------------------------------------- */
 router.get("/departments/users", listDepartmentsSA);
-router.post("/departments/users", addDepartmentUser);
-router.put("/departments/users/:id", updateDepartmentUser);
+router.post("/departments/users", uploadDepartmentPhoto, addDepartmentUser);
 router.get("/departments/users/:id", getDepartmentByIdSA);
-
+router.put(
+  "/departments/users/:id",
+  uploadDepartmentPhoto,
+  updateDepartmentUser
+);
 
 /* -------------------------------------------------------------------------- */
 /* 🟨 PUBLIC USER MANAGEMENT                                                   */

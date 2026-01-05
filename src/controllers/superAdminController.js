@@ -4,21 +4,19 @@ import User from "../models/User.js";
 import Complaint from "../models/Complaint.js";
 import DeletedUser from "../models/DeletedUser.js";
 
-// ⭐ SAME LOGIC IMPORTED FROM authController (copy here)
-async function generateUniqueIdForDM() {
+// 🔥 GENERIC UNIQUE ID (FOR DM + DEPARTMENT)
+async function generateUniqueSJDId() {
   const currentYear = new Date().getFullYear();
 
-  // Find last DM with pattern: SJD/2025/xxxx
-  const lastDM = await User.findOne({
+  const lastUser = await User.findOne({
     uniqueId: new RegExp(`SJD/${currentYear}/`),
   }).sort({ createdAt: -1 });
 
   let lastNumber = 0;
 
-  if (lastDM && lastDM.uniqueId) {
-    const parts = lastDM.uniqueId.split("/");
-    // SJD / 2025 / 0045 → parts[2] = 0045
-    lastNumber = parseInt(parts[2]);
+  if (lastUser?.uniqueId) {
+    const parts = lastUser.uniqueId.split("/");
+    lastNumber = parseInt(parts[2], 10);
   }
 
   const newNumber = (lastNumber + 1).toString().padStart(4, "0");
@@ -98,7 +96,7 @@ export const listDMs = asyncHandler(async (_, res) => {
 
 export const addDM = asyncHandler(async (req, res) => {
   // ⭐ Generate SJD/Year/000X
-  const uniqueId = await generateUniqueIdForDM();
+  const uniqueId = await generateUniqueSJDId();
 
   const data = {
     ...req.body,
@@ -190,15 +188,81 @@ export const listDepartmentsSA = asyncHandler(async (_, res) => {
 });
 
 export const addDepartmentUser = asyncHandler(async (req, res) => {
-  const depUser = await User.create({ ...req.body, role: "department" });
-  res.status(201).json({ success: true, depUser });
+  const uniqueId = await generateUniqueSJDId();
+
+  const data = {
+    ...req.body,
+    role: "department",
+    uniqueId,
+  };
+
+  if (req.file) {
+    data.photo = req.file.filename;
+  }
+
+  const depUser = await User.create(data);
+
+  res.status(201).json({
+    success: true,
+    depUser,
+  });
 });
 
 export const updateDepartmentUser = asyncHandler(async (req, res) => {
-  const depUser = await User.findByIdAndUpdate(req.params.id, req.body, {
-    new: true,
+  const department = await User.findById(req.params.id);
+
+  if (!department || department.isDeleted) {
+    return res.status(404).json({ message: "Department not found" });
+  }
+
+  const allowedFields = [
+    "firstName",
+    "lastName",
+    "email",
+    "phone",
+    "gender",
+    "dob",
+    "address",
+    "city",
+    "district",
+    "state",
+    "country",
+    "pincode",
+    "designation",
+    "departmentName",
+    "role",
+  ];
+
+  let firstNameChanged = false;
+  let lastNameChanged = false;
+
+  allowedFields.forEach((field) => {
+    if (req.body[field] !== undefined) {
+      department[field] = req.body[field];
+
+      if (field === "firstName") firstNameChanged = true;
+      if (field === "lastName") lastNameChanged = true;
+    }
   });
-  res.json({ success: true, depUser });
+
+  // 🔥 IMPORTANT FIX: always sync `name`
+  if (firstNameChanged || lastNameChanged) {
+    department.name = `${department.firstName || ""} ${
+      department.lastName || ""
+    }`.trim();
+  }
+
+  if (req.file) {
+    department.photo = req.file.filename;
+  }
+
+  department.updatedAt = new Date();
+  await department.save();
+
+  res.json({
+    success: true,
+    depUser: department,
+  });
 });
 
 // 🔍 GET SINGLE DEPARTMENT BY ID (FOR VIEW PAGE)
